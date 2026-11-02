@@ -1333,7 +1333,11 @@ export const CHALLENGE_TOPICS: ChallengeTopicDefinition[] = [
 ];
 
 // Helper to construct a full ClinicalCase from Topic and Variation
-export function buildCaseFromTopicAndVariation(topic: ChallengeTopicDefinition, variationIndex = 0): ClinicalCase {
+export function buildCaseFromTopicAndVariation(
+  topic: ChallengeTopicDefinition, 
+  variationIndex = 0,
+  createdAtTimestamp?: number
+): ClinicalCase {
   const variation = topic.variations[variationIndex % topic.variations.length];
   
   // Assemble available supplies: required + prohibited distractors + relevant general tools
@@ -1343,12 +1347,16 @@ export function buildCaseFromTopicAndVariation(topic: ChallengeTopicDefinition, 
     ['gloves', 'sterile_saline', 'sterile_gauze', 'elastic_bandage', 'oral_paracetamol', 'emergency_ambulance', 'hospital_referral'].includes(s.id)
   );
 
+  const topicIndex = CHALLENGE_TOPICS.findIndex(t => t.topicId === topic.topicId);
+  const baselineEpoch = 1700000000000 + (Math.max(0, topicIndex) * 10 + variationIndex) * 60000;
+
   return {
     id: `${topic.topicId}-var${variation.variationIndex}`,
     title: `${topic.topicTitle}: ${variation.patientName}`,
     category: topic.category,
     difficulty: topic.defaultDifficulty,
     timeLimitSeconds: topic.timeLimitSeconds,
+    createdAt: createdAtTimestamp !== undefined ? createdAtTimestamp : baselineEpoch,
     patient: {
       name: variation.patientName,
       gender: variation.gender,
@@ -1402,9 +1410,9 @@ export function buildCaseFromTopicAndVariation(topic: ChallengeTopicDefinition, 
   };
 }
 
-// Full array of default cases (variation 1 of each topic)
-export const CASE_LIBRARY: ClinicalCase[] = CHALLENGE_TOPICS.map(topic => 
-  buildCaseFromTopicAndVariation(topic, 0)
+// Full array of default cases (variation 1 of each topic, ordered chronologically)
+export const CASE_LIBRARY: ClinicalCase[] = CHALLENGE_TOPICS.map((topic, idx) => 
+  buildCaseFromTopicAndVariation(topic, 0, 1700000000000 + idx * 60000)
 );
 
 export const getCaseById = (id: string): ClinicalCase | undefined => {
@@ -1434,31 +1442,175 @@ export function getTopicVariations(topicId: string): ClinicalCase[] {
   return topic.variations.map((_, idx) => buildCaseFromTopicAndVariation(topic, idx));
 }
 
-// Daily challenge seeded by date to provide a fresh random topic & random variation each day!
+// Helpers for calendar date keys
+export function getDateKey(date: Date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+export function getWeekKey(date: Date = new Date()): string {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+function stringToSeed(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+// High acuity topics suitable for Hard and Super Hard challenges
+const HIGH_ACUITY_TOPIC_IDS = [
+  'topic-wound-arterial',
+  'topic-acute-asthma',
+  'topic-cardiac-arrest',
+  'topic-acute-anaphylaxis',
+  'topic-toxicology-kerosene',
+  'topic-bites-snakebite',
+  'topic-metabolic-seizure',
+  'topic-pediatric-infant-choking',
+  'topic-burns-chemical-eye',
+  'topic-musculo-sprain'
+];
+
+/**
+ * Daily Challenge:
+ * Deterministically keyed to the calendar date string (e.g. "2026-11-02").
+ * Difficulty: Strictly 'advanced' (Hard) or 'expert' (Super Hard).
+ * Reward: Plenty of XP (+750 XP bonus) and unlocks the very rare badge 'rare_daily_titan'.
+ * When date rolls over to next day, a brand new challenge for that date is generated automatically!
+ */
 export const getDailyChallengeCase = (date: Date = new Date()): ClinicalCase => {
-  const year = date.getFullYear();
-  const month = date.getMonth();
-  const day = date.getDate();
-  const dayNumber = year * 1000 + (month + 1) * 31 + day;
+  const dateKey = getDateKey(date);
+  const seed = stringToSeed(dateKey);
   
-  const topicIndex = dayNumber % CHALLENGE_TOPICS.length;
-  const variationIndex = (Math.floor(dayNumber / 7)) % 5;
+  // Filter high-acuity topics for hard-to-super-hard daily challenges
+  const eligibleTopics = CHALLENGE_TOPICS.filter(t => HIGH_ACUITY_TOPIC_IDS.includes(t.topicId));
+  const topicPool = eligibleTopics.length > 0 ? eligibleTopics : CHALLENGE_TOPICS;
   
-  return buildCaseFromTopicAndVariation(CHALLENGE_TOPICS[topicIndex], variationIndex);
+  const topicIndex = seed % topicPool.length;
+  const variationIndex = (Math.floor(seed / 7)) % 5;
+  const topic = topicPool[topicIndex];
+  
+  // Difficulty strictly hard (advanced) or super hard (expert)
+  const isSuperHard = (seed % 2) === 1;
+  const difficulty: 'advanced' | 'expert' = isSuperHard ? 'expert' : 'advanced';
+
+  const baseCase = buildCaseFromTopicAndVariation(topic, variationIndex);
+
+  return {
+    ...baseCase,
+    id: `daily-${dateKey}`,
+    title: `[DAILY CRISIS • ${difficulty === 'expert' ? 'SUPER HARD' : 'HARD'}] ${topic.topicTitle}: ${baseCase.patient.name}`,
+    difficulty,
+    isDailyChallenge: true,
+    bonusXp: isSuperHard ? 850 : 700,
+    specialBadgeReward: 'rare_daily_titan',
+    timeLimitSeconds: baseCase.timeLimitSeconds ? Math.min(baseCase.timeLimitSeconds, 75) : 80,
+    createdAt: new Date(`${dateKey}T00:00:00`).getTime() || Date.now(),
+    presentingComplaint: `⚡ [HIGH-STAKES DAILY CRISIS] ${baseCase.presentingComplaint}`,
+    visibleFindings: [
+      `High-stakes daily emergency simulation with zero tolerance for procedural oversights.`,
+      ...baseCase.visibleFindings
+    ]
+  };
 };
 
-// Weekly challenge
+/**
+ * Weekly Challenge:
+ * Deterministically keyed to current year and ISO week (e.g. "2026-W45").
+ * Difficulty: Strictly 'expert' (Super Hard).
+ * Reward: Massive XP (+1500 XP bonus) and unlocks the legendary rare badge 'rare_weekly_oracle'.
+ * Automatically replaces the old weekly challenge when the week rolls over!
+ */
 export const getWeeklyChallengeCase = (date: Date = new Date()): ClinicalCase => {
-  const weekNumber = Math.floor((date.getTime() - new Date(date.getFullYear(), 0, 1).getTime()) / (7 * 86400000));
-  const emergencyTopics = CHALLENGE_TOPICS.filter(t => t.category === 'acute_emergency' || t.category === 'cardiac_circulation' || t.category === 'bites_stings');
-  const topicIndex = weekNumber % emergencyTopics.length;
-  const variationIndex = (weekNumber * 3) % 5;
-  return buildCaseFromTopicAndVariation(emergencyTopics[topicIndex] || CHALLENGE_TOPICS[0], variationIndex);
+  const weekKey = getWeekKey(date);
+  const seed = stringToSeed(weekKey);
+  
+  // Pick from apex emergency topics
+  const apexTopics = CHALLENGE_TOPICS.filter(t => 
+    t.injuryType === 'cardiac_arrest' || 
+    t.injuryType === 'arterial_bleed' || 
+    t.injuryType === 'anaphylaxis' || 
+    t.injuryType === 'bite_sting' ||
+    t.injuryType === 'asthma'
+  );
+  const pool = apexTopics.length > 0 ? apexTopics : CHALLENGE_TOPICS;
+  const topic = pool[seed % pool.length];
+  const variationIndex = (seed * 3) % 5;
+
+  const baseCase = buildCaseFromTopicAndVariation(topic, variationIndex);
+
+  return {
+    ...baseCase,
+    id: `weekly-${weekKey}`,
+    title: `[WEEKLY CRUCIBLE • SUPER HARD] ${topic.topicTitle}: ${baseCase.patient.name}`,
+    difficulty: 'expert',
+    isWeeklyChallenge: true,
+    bonusXp: 1500,
+    specialBadgeReward: 'rare_weekly_oracle',
+    timeLimitSeconds: 60, // 60s intense super hard limit
+    createdAt: Date.now() - ((date.getDay() || 7) - 1) * 86400000,
+    presentingComplaint: `🔥 [WEEKLY APEX CRUCIBLE - SUPER HARD] Multi-system acute clinical crisis. ${baseCase.presentingComplaint}`,
+    visibleFindings: [
+      `Critical poly-trauma / life-threat: Maximum guideline rigor with 60s rapid escalation window.`,
+      ...baseCase.visibleFindings
+    ]
+  };
 };
+
+/**
+ * Generates 5 new distinct case challenges on demand.
+ * Distinct categories, random variations, realistic vitals, and chronological timestamps.
+ */
+export function generateBatch5Challenges(startFromTimestamp = Date.now()): ClinicalCase[] {
+  // Diverse domains to choose from
+  const candidateTopics = [...CHALLENGE_TOPICS].sort(() => 0.5 - Math.random());
+  const selectedTopics = candidateTopics.slice(0, 5);
+  
+  // If fewer than 5 topics available, pad from full array
+  while (selectedTopics.length < 5) {
+    selectedTopics.push(CHALLENGE_TOPICS[selectedTopics.length % CHALLENGE_TOPICS.length]);
+  }
+
+  const generatedBatch: ClinicalCase[] = [];
+
+  for (let i = 0; i < selectedTopics.length; i++) {
+    const topic = selectedTopics[i];
+    const variationIndex = Math.floor(Math.random() * topic.variations.length);
+    const uniqueId = `batch-case-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`;
+    const timestamp = startFromTimestamp + (i * 1000);
+    
+    // Vary difficulties: intermediate, advanced, expert
+    const diffs: ('intermediate' | 'advanced' | 'expert')[] = ['intermediate', 'advanced', 'expert'];
+    const assignedDiff = diffs[i % diffs.length];
+
+    const base = buildCaseFromTopicAndVariation(topic, variationIndex, timestamp);
+
+    generatedBatch.push({
+      ...base,
+      id: uniqueId,
+      difficulty: assignedDiff,
+      createdAt: timestamp,
+      title: `Case #${i + 1} (${assignedDiff.toUpperCase()}): ${topic.topicTitle} - ${base.patient.name}`
+    });
+  }
+
+  return generatedBatch;
+}
 
 // Random challenge picker (selects any random topic + random variation)
 export const getRandomChallengeCase = (): ClinicalCase => {
   const topicIndex = Math.floor(Math.random() * CHALLENGE_TOPICS.length);
   const variationIndex = Math.floor(Math.random() * 5);
-  return buildCaseFromTopicAndVariation(CHALLENGE_TOPICS[topicIndex], variationIndex);
+  return buildCaseFromTopicAndVariation(CHALLENGE_TOPICS[topicIndex], variationIndex, Date.now());
 };
+

@@ -10,7 +10,9 @@ import {
   buildCaseFromTopicAndVariation,
   getDailyChallengeCase, 
   getWeeklyChallengeCase,
-  getRandomChallengeCase
+  getRandomChallengeCase,
+  getDateKey,
+  getWeekKey
 } from '../../data/caseLibrary';
 import { 
   Play, 
@@ -29,9 +31,6 @@ import {
   ChevronDown, 
   ChevronUp, 
   CheckCircle2, 
-  Eye, 
-  EyeOff, 
-  Check, 
   ShieldAlert,
   FlameKindling,
   HeartPulse,
@@ -41,7 +40,12 @@ import {
   Baby,
   SmilePlus,
   Stethoscope,
-  Filter
+  Filter,
+  Crown,
+  PlusCircle,
+  History,
+  Check,
+  AlertTriangle
 } from 'lucide-react';
 
 interface ChallengeDashboardProps {
@@ -49,11 +53,13 @@ interface ChallengeDashboardProps {
   onStartCase: (c: ClinicalCase) => void;
   hasUnfinishedSession?: boolean;
   onResumeSession?: () => void;
-  onGenerateAiCase: (category: CaseCategory, difficulty: DifficultyLevel) => void;
-  isGeneratingAi?: boolean;
+  dashboardCases?: ClinicalCase[];
+  onGenerateBatch5?: () => void;
+  isGeneratingBatch?: boolean;
+  dailyCase?: ClinicalCase;
+  weeklyCase?: ClinicalCase;
 }
 
-// Emergency domain categorization mapping for clean fold accordions
 interface DomainGroup {
   id: string;
   category: CaseCategory;
@@ -159,25 +165,26 @@ export const ChallengeDashboard: React.FC<ChallengeDashboardProps> = ({
   onStartCase,
   hasUnfinishedSession,
   onResumeSession,
-  onGenerateAiCase,
-  isGeneratingAi = false
+  dashboardCases = [],
+  onGenerateBatch5,
+  isGeneratingBatch = false,
+  dailyCase: propDailyCase,
+  weeklyCase: propWeeklyCase
 }) => {
-  // Top Level Dashboard Tabs
-  const [dashboardTab, setDashboardTab] = useState<'matrix_folds' | 'featured' | 'archive'>('matrix_folds');
+  // Top Level Dashboard Tabs: Active Challenges Stream, Domain Accordions, Completed Archive
+  const [dashboardTab, setDashboardTab] = useState<'stream' | 'matrix_folds' | 'archive'>('stream');
 
   // Filters
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
-  const [hideCompleted, setHideCompleted] = useState<boolean>(true);
 
   // Active variation selected per topic
   const [activeVariationMap, setActiveVariationMap] = useState<Record<string, number>>({});
 
   // Folds (Accordions) state: record of domainId -> isOpen boolean
-  // Initially expand the first 2 domains, collapse others for a clean compact screen
   const [openFolds, setOpenFolds] = useState<Record<string, boolean>>({
     trauma: true,
-    musculoskeletal: true,
+    musculoskeletal: false,
     burns_environmental: false,
     acute_emergency: false,
     cardiac_circulation: false,
@@ -189,24 +196,43 @@ export const ChallengeDashboard: React.FC<ChallengeDashboardProps> = ({
     pediatric: false
   });
 
-  const dailyCase = getDailyChallengeCase();
-  const weeklyCase = getWeeklyChallengeCase();
+  const dailyCase = propDailyCase || getDailyChallengeCase();
+  const weeklyCase = propWeeklyCase || getWeeklyChallengeCase();
 
-  // Helper to check if a specific variation is completed
-  const isVariationCompleted = (topicId: string, varIndex: number) => {
+  // Helper to determine if a challenge is completed
+  const isCaseCompleted = (caseId: string, caseTitle?: string) => {
     return profile.history.some(h => 
-      h.caseId === `${topicId}-var${varIndex + 1}` ||
-      (varIndex === 0 && h.caseId === topicId)
+      h.caseId === caseId || 
+      (caseTitle && h.caseTitle.toLowerCase().trim() === caseTitle.toLowerCase().trim()) ||
+      (caseId.includes('topic-') && h.caseId.includes(caseId.split('-var')[0]))
     );
   };
 
-  // Helper to check if a topic has any completed runs
+  // Helper for topic completion
   const isTopicCompleted = (topicId: string) => {
     return profile.history.some(h => h.caseId.includes(topicId));
   };
 
-  const completedTopicsCount = CHALLENGE_TOPICS.filter(t => isTopicCompleted(t.topicId)).length;
+  const isDailyCompleted = isCaseCompleted(dailyCase.id, dailyCase.title);
+  const isWeeklyCompleted = isCaseCompleted(weeklyCase.id, weeklyCase.title);
 
+  // Requirement: "All other challenges on the dashboard page that are completed should be moved to the completed page."
+  // Uncompleted challenges list strictly for dashboard
+  const uncompletedCases = dashboardCases.filter(c => !isCaseCompleted(c.id, c.title));
+
+  // Requirement: "challenges should be displayed from oldest to newest, with the oldest at the top"
+  const sortedUncompletedCases = [...uncompletedCases].sort((a, b) => {
+    return (a.createdAt || 0) - (b.createdAt || 0);
+  });
+
+  // Filtered by tier and category
+  const filteredCases = sortedUncompletedCases.filter(c => {
+    if (selectedDifficulty !== 'all' && c.difficulty !== selectedDifficulty) return false;
+    if (selectedCategoryFilter !== 'all' && c.category !== selectedCategoryFilter) return false;
+    return true;
+  });
+
+  const completedCount = profile.history.length;
   const successRate = profile.casesCompleted > 0 
     ? Math.round((profile.casesSuccessful / profile.casesCompleted) * 100) 
     : 100;
@@ -236,24 +262,9 @@ export const ChallengeDashboard: React.FC<ChallengeDashboardProps> = ({
     onStartCase(clinicalCase);
   };
 
-  const handleLaunchRandomVariation = (topic: typeof CHALLENGE_TOPICS[0]) => {
-    const randomVar = Math.floor(Math.random() * 5);
-    setActiveVariationMap(prev => ({ ...prev, [topic.topicId]: randomVar }));
-    const clinicalCase = buildCaseFromTopicAndVariation(topic, randomVar);
-    onStartCase(clinicalCase);
-  };
-
-  const handleLaunchRandomInDomain = (domainGroup: DomainGroup) => {
-    const matching = CHALLENGE_TOPICS.filter(t => t.category === domainGroup.category);
-    if (matching.length === 0) return;
-    const pickedTopic = matching[Math.floor(Math.random() * matching.length)];
-    const randomVar = Math.floor(Math.random() * 5);
-    onStartCase(buildCaseFromTopicAndVariation(pickedTopic, randomVar));
-  };
-
   return (
     <div className="w-full max-w-full overflow-x-hidden space-y-6 pb-12">
-      {/* Hero Progression Banner (Bounded, zero overflow) */}
+      {/* Hero Progression Banner (Bounded, zero horizontal overflow) */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950/80 border border-slate-700/80 p-4 sm:p-7 shadow-2xl">
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
           <div className="space-y-3 min-w-0">
@@ -266,9 +277,9 @@ export const ChallengeDashboard: React.FC<ChallengeDashboardProps> = ({
                 <Flame className="w-3.5 h-3.5 text-amber-400" />
                 {profile.streakDays} Day Streak
               </span>
-              <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1 shrink-0">
-                <Layers className="w-3.5 h-3.5" />
-                11 Domains • 5 Variations Each
+              <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1 shrink-0">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                {completedCount} Completed
               </span>
             </div>
 
@@ -296,6 +307,16 @@ export const ChallengeDashboard: React.FC<ChallengeDashboardProps> = ({
 
           {/* Quick Launcher Action Buttons */}
           <div className="flex flex-col sm:flex-row lg:flex-col gap-2 shrink-0">
+            {/* Generate 5 New Challenges Action Button */}
+            <button
+              onClick={onGenerateBatch5}
+              disabled={isGeneratingBatch}
+              className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-xs sm:text-sm px-5 py-3 rounded-xl shadow-xl shadow-indigo-950/60 transition flex items-center justify-center gap-2 cursor-pointer shrink-0 border border-indigo-400/30"
+            >
+              <Sparkles className="w-4 h-4 text-amber-300" />
+              <span>{isGeneratingBatch ? 'Generating 5 Cases...' : '⚡ Generate 5 New Challenges'}</span>
+            </button>
+
             {hasUnfinishedSession && (
               <button
                 onClick={onResumeSession}
@@ -307,19 +328,11 @@ export const ChallengeDashboard: React.FC<ChallengeDashboardProps> = ({
             )}
 
             <button
-              onClick={() => onStartCase(buildCaseFromTopicAndVariation(CHALLENGE_TOPICS[0], 0))}
-              className="bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs sm:text-sm px-5 py-3 rounded-xl shadow-xl shadow-cyan-950/50 transition flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Play className="w-4 h-4 fill-white" />
-              <span>Start Quick Challenge</span>
-            </button>
-
-            <button
               onClick={() => onStartCase(getRandomChallengeCase())}
-              className="bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-xs px-3.5 py-2 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
+              className="bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-xs px-3.5 py-2.5 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
             >
-              <Dices className="w-3.5 h-3.5 text-amber-400" />
-              <span>Surprise Random Challenge</span>
+              <Dices className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Surprise Random Case</span>
             </button>
           </div>
         </div>
@@ -328,26 +341,175 @@ export const ChallengeDashboard: React.FC<ChallengeDashboardProps> = ({
       {/* Stats Summary Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 sm:p-4 text-center">
-          <div className="text-xl sm:text-2xl font-black text-white font-mono">{profile.casesCompleted}</div>
-          <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">Cases Completed</div>
+          <div className="text-xl sm:text-2xl font-black text-cyan-400 font-mono">{uncompletedCases.length}</div>
+          <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">Active Challenges</div>
         </div>
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 sm:p-4 text-center">
-          <div className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">{successRate}%</div>
+          <div className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">{completedCount}</div>
+          <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">Moved to Completed</div>
+        </div>
+        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 sm:p-4 text-center">
+          <div className="text-xl sm:text-2xl font-black text-amber-400 font-mono">{successRate}%</div>
           <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">Success Rate</div>
         </div>
         <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 sm:p-4 text-center">
-          <div className="text-xl sm:text-2xl font-black text-cyan-400 font-mono">{CHALLENGE_TOPICS.length * 5}</div>
-          <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">Total Variations</div>
+          <div className="text-xl sm:text-2xl font-black text-purple-400 font-mono">11 Domains</div>
+          <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">Clinical Guidelines</div>
         </div>
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-3 sm:p-4 text-center">
-          <div className="text-xl sm:text-2xl font-black text-purple-400 font-mono">11</div>
-          <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">Clinical Domains</div>
+      </div>
+
+      {/* DAILY & WEEKLY SPECIAL CHALLENGES SECTION (Hard to Super Hard, Big XP, Rare Badges, Auto-Rollover) */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+          <span className="font-bold uppercase tracking-wider text-[11px] text-slate-300 flex items-center gap-1.5">
+            <Zap className="w-3.5 h-3.5 text-amber-400" />
+            Special Time-Bound Challenges (Auto-refresh on date & week rollover)
+          </span>
+          <span className="text-[10px] text-slate-500">Uncompleted cases automatically roll over when due</span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* DAILY CHALLENGE CARD */}
+          <div className={`relative overflow-hidden rounded-2xl border p-5 shadow-xl flex flex-col justify-between transition ${
+            isDailyCompleted
+              ? 'bg-slate-900/60 border-emerald-500/40 opacity-90'
+              : 'bg-gradient-to-br from-slate-900 via-slate-900/90 to-cyan-950/40 border-cyan-500/40'
+          }`}>
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                  <Calendar className="w-3 h-3 text-cyan-400" />
+                  Daily Challenge • {getDateKey()}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-amber-400" /> +{dailyCase.bonusXp || 750} XP
+                  </span>
+                  <span className="bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Crown className="w-3 h-3 text-purple-400" /> Rare Badge
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                    dailyCase.difficulty === 'expert' 
+                      ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' 
+                      : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  }`}>
+                    {dailyCase.difficulty === 'expert' ? 'Super Hard (Expert)' : 'Hard (Advanced)'}
+                  </span>
+                  <span className="text-[10px] text-slate-400">Award: Daily Crisis Titan</span>
+                </div>
+                <h3 className="font-bold text-white text-base leading-snug">{dailyCase.title}</h3>
+                <p className="text-xs text-slate-300 line-clamp-2 mt-1 leading-relaxed">
+                  {dailyCase.presentingComplaint}
+                </p>
+              </div>
+
+              <div className="bg-slate-950/60 rounded-xl p-2.5 border border-slate-800 text-[11px] text-slate-300 flex items-center justify-between">
+                <span className="text-slate-400">Patient: <strong className="text-white">{dailyCase.patient.name}</strong> ({dailyCase.patient.age}y, {dailyCase.patient.gender})</span>
+                {dailyCase.timeLimitSeconds && (
+                  <span className="text-rose-400 font-bold flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> {dailyCase.timeLimitSeconds}s Timed
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
+              <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                <RotateCcw className="w-3 h-3 text-cyan-400" />
+                Refreshes at midnight automatically
+              </span>
+              <button
+                onClick={() => onStartCase(dailyCase)}
+                className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-cyan-950/50"
+              >
+                <span>{isDailyCompleted ? 'Replay Daily Case' : 'Play Today\'s Daily Case'}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* WEEKLY CHALLENGE CARD */}
+          <div className={`relative overflow-hidden rounded-2xl border p-5 shadow-xl flex flex-col justify-between transition ${
+            isWeeklyCompleted
+              ? 'bg-slate-900/60 border-emerald-500/40 opacity-90'
+              : 'bg-gradient-to-br from-slate-900 via-slate-900/90 to-purple-950/40 border-purple-500/40'
+          }`}>
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                  <Trophy className="w-3 h-3 text-purple-400" />
+                  Weekly Crucible • {getWeekKey()}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-amber-400" /> +{weeklyCase.bonusXp || 1500} XP
+                  </span>
+                  <span className="bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Crown className="w-3 h-3 text-fuchsia-400" /> Very Rare Badge
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                    Super Hard (Expert)
+                  </span>
+                  <span className="text-[10px] text-slate-400">Award: Weekly Master Oracle</span>
+                </div>
+                <h3 className="font-bold text-white text-base leading-snug">{weeklyCase.title}</h3>
+                <p className="text-xs text-slate-300 line-clamp-2 mt-1 leading-relaxed">
+                  {weeklyCase.presentingComplaint}
+                </p>
+              </div>
+
+              <div className="bg-slate-950/60 rounded-xl p-2.5 border border-slate-800 text-[11px] text-slate-300 flex items-center justify-between">
+                <span className="text-slate-400">Patient: <strong className="text-white">{weeklyCase.patient.name}</strong> ({weeklyCase.patient.age}y, {weeklyCase.patient.gender})</span>
+                {weeklyCase.timeLimitSeconds && (
+                  <span className="text-rose-400 font-bold flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> {weeklyCase.timeLimitSeconds}s Timed
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
+              <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                <RotateCcw className="w-3 h-3 text-purple-400" />
+                Refreshes weekly automatically
+              </span>
+              <button
+                onClick={() => onStartCase(weeklyCase)}
+                className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-purple-950/50"
+              >
+                <span>{isWeeklyCompleted ? 'Replay Weekly Case' : 'Play Super Hard Weekly'}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* DASHBOARD TABS BAR */}
       <div className="w-full max-w-full flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
         <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-2xl border border-slate-800 shrink-0">
+          <button
+            onClick={() => setDashboardTab('stream')}
+            className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+              dashboardTab === 'stream'
+                ? 'bg-cyan-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5" />
+            <span>Active Challenges ({uncompletedCases.length})</span>
+          </button>
+
           <button
             onClick={() => setDashboardTab('matrix_folds')}
             className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
@@ -361,18 +523,6 @@ export const ChallengeDashboard: React.FC<ChallengeDashboardProps> = ({
           </button>
 
           <button
-            onClick={() => setDashboardTab('featured')}
-            className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
-              dashboardTab === 'featured'
-                ? 'bg-cyan-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Zap className="w-3.5 h-3.5" />
-            <span>Daily & Featured Cases</span>
-          </button>
-
-          <button
             onClick={() => setDashboardTab('archive')}
             className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
               dashboardTab === 'archive'
@@ -381,53 +531,52 @@ export const ChallengeDashboard: React.FC<ChallengeDashboardProps> = ({
             }`}
           >
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Completed Archive ({completedTopicsCount})</span>
+            <span>Completed Archive ({completedCount})</span>
           </button>
         </div>
 
-        {/* Global Fold Controls (Only on Folds Tab) */}
-        {dashboardTab === 'matrix_folds' && (
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <button
-              onClick={() => handleExpandAllFolds(true)}
-              className="text-slate-400 hover:text-white px-2 py-1 rounded-lg hover:bg-slate-800 text-[11px] font-semibold transition cursor-pointer"
-            >
-              Expand All
-            </button>
-            <span className="text-slate-700">•</span>
-            <button
-              onClick={() => handleExpandAllFolds(false)}
-              className="text-slate-400 hover:text-white px-2 py-1 rounded-lg hover:bg-slate-800 text-[11px] font-semibold transition cursor-pointer"
-            >
-              Collapse All
-            </button>
-            <span className="text-slate-700">•</span>
-            <button
-              onClick={() => setHideCompleted(!hideCompleted)}
-              className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition flex items-center gap-1.5 cursor-pointer ${
-                hideCompleted
-                  ? 'bg-slate-900 border-slate-700 text-slate-300'
-                  : 'bg-emerald-950/70 border-emerald-500/40 text-emerald-300'
-              }`}
-            >
-              {hideCompleted ? <EyeOff className="w-3 h-3 text-slate-400" /> : <Eye className="w-3 h-3 text-emerald-400" />}
-              <span>{hideCompleted ? `Hide Completed (${completedTopicsCount})` : 'Show All'}</span>
-            </button>
-          </div>
-        )}
+        {/* Informational Completed Counter and Generate Button */}
+        <div className="flex items-center gap-2">
+          {completedCount > 0 && (
+            <span className="text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-lg flex items-center gap-1">
+              <Check className="w-3 h-3" />
+              <span>{completedCount} completed moved to archive</span>
+            </span>
+          )}
+
+          <button
+            onClick={onGenerateBatch5}
+            disabled={isGeneratingBatch}
+            className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow border border-indigo-500/40 shrink-0"
+          >
+            <PlusCircle className="w-3.5 h-3.5 text-amber-300" />
+            <span>{isGeneratingBatch ? 'Generating 5...' : '+ Generate 5 Challenges'}</span>
+          </button>
+        </div>
       </div>
 
-      {/* TAB CONTENT 1: EMERGENCY DOMAIN FOLDS (ACCORDIONS) */}
-      {dashboardTab === 'matrix_folds' && (
+      {/* TAB CONTENT 1: ACTIVE CHALLENGES STREAM (Sorted Oldest to Newest, Oldest at Top) */}
+      {dashboardTab === 'stream' && (
         <div className="space-y-4">
-          {/* Difficulty & Category Filter Bar (Wrapping, zero overflow) */}
-          <div className="flex flex-wrap items-center gap-2 text-xs">
+          {/* Ordering info and Filters */}
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold text-slate-300 bg-slate-800/80 border border-slate-700 px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                Sorted: Oldest to Newest (Oldest at top)
+              </span>
+              <span className="text-[11px] text-slate-400">
+                Showing {filteredCases.length} uncompleted challenges
+              </span>
+            </div>
+
+            {/* Filter by Tier */}
             <div className="flex flex-wrap items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
               <span className="text-[11px] font-bold text-slate-400 px-2 flex items-center gap-1">
                 <Filter className="w-3 h-3" /> Tier:
               </span>
               {[
-                { id: 'all', label: 'All Tiers' },
+                { id: 'all', label: 'All' },
                 { id: 'beginner', label: 'Beginner' },
                 { id: 'intermediate', label: 'Intermediate' },
                 { id: 'advanced', label: 'Advanced' },
@@ -436,7 +585,7 @@ export const ChallengeDashboard: React.FC<ChallengeDashboardProps> = ({
                 <button
                   key={diff.id}
                   onClick={() => setSelectedDifficulty(diff.id)}
-                  className={`px-2.5 py-1 rounded-lg font-medium transition cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition cursor-pointer ${
                     selectedDifficulty === diff.id
                       ? 'bg-slate-700 text-white shadow'
                       : 'text-slate-400 hover:text-slate-200'
@@ -448,19 +597,131 @@ export const ChallengeDashboard: React.FC<ChallengeDashboardProps> = ({
             </div>
           </div>
 
-          {/* RENDER THE 11 DOMAIN FOLDS */}
+          {filteredCases.length === 0 ? (
+            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-8 text-center text-xs text-slate-400 space-y-3">
+              <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-500" />
+              <p className="font-bold text-slate-200 text-sm">All challenges in this filter are completed and moved to the Completed Archive!</p>
+              <p className="text-slate-400">Click below to generate 5 new challenging emergency cases.</p>
+              <button
+                onClick={onGenerateBatch5}
+                disabled={isGeneratingBatch}
+                className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition inline-flex items-center gap-2 cursor-pointer shadow-lg"
+              >
+                <PlusCircle className="w-4 h-4 text-amber-300" />
+                <span>Generate 5 New Challenges</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {filteredCases.map((c, index) => {
+                const isOldest = index === 0;
+                return (
+                  <div
+                    key={c.id}
+                    className={`bg-slate-950/80 border rounded-2xl p-4 flex flex-col justify-between transition group space-y-3 shadow-md ${
+                      isOldest ? 'border-cyan-500/50 ring-1 ring-cyan-500/20' : 'border-slate-800/90 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-1 text-[10px]">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`px-2 py-0.5 rounded-md font-bold font-mono ${
+                            isOldest 
+                              ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' 
+                              : 'bg-slate-800 text-slate-300'
+                          }`}>
+                            #{index + 1} {isOldest ? '• Oldest' : ''}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-md font-semibold capitalize ${
+                            c.difficulty === 'expert' ? 'bg-rose-500/20 text-rose-300' :
+                            c.difficulty === 'advanced' ? 'bg-amber-500/20 text-amber-300' :
+                            c.difficulty === 'intermediate' ? 'bg-blue-500/20 text-blue-300' : 'bg-slate-800 text-slate-300'
+                          }`}>
+                            {c.difficulty}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 capitalize">
+                          {c.category.replace('_', ' ')}
+                        </span>
+                      </div>
+
+                      <div>
+                        <h4 className="font-bold text-white text-sm group-hover:text-cyan-300 transition line-clamp-1">
+                          {c.title}
+                        </h4>
+                        <div className="flex items-center gap-1.5 text-xs text-cyan-400 font-semibold mt-0.5">
+                          <Users className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{c.patient.name} ({c.patient.age}y, {c.patient.gender})</span>
+                        </div>
+                      </div>
+
+                      <p className="text-[11px] text-slate-300 line-clamp-2 italic font-serif leading-tight">
+                        "{c.patientStatement}"
+                      </p>
+
+                      <div className="text-[10px] text-slate-400 line-clamp-1">
+                        Complaint: {c.presentingComplaint}
+                      </div>
+                    </div>
+
+                    <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between">
+                      <div className="text-[11px] text-slate-400">
+                        {c.timeLimitSeconds ? (
+                          <span className="flex items-center gap-1 text-rose-400 font-semibold">
+                            <Clock className="w-3 h-3" /> {c.timeLimitSeconds}s Timed
+                          </span>
+                        ) : (
+                          <span>Untimed</span>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={() => onStartCase(c)}
+                        className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl transition flex items-center gap-1 cursor-pointer shadow-sm"
+                      >
+                        <span>Start Challenge</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB CONTENT 2: EMERGENCY DOMAIN ACCORDIONS / FOLDS */}
+      {dashboardTab === 'matrix_folds' && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span className="text-slate-400">
+              Systematic clinical domain review (Completed challenges are automatically moved to Completed Archive)
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleExpandAllFolds(true)}
+                className="text-slate-400 hover:text-white px-2 py-1 rounded-lg hover:bg-slate-800 text-[11px] font-semibold transition cursor-pointer"
+              >
+                Expand All
+              </button>
+              <span className="text-slate-700">•</span>
+              <button
+                onClick={() => handleExpandAllFolds(false)}
+                className="text-slate-400 hover:text-white px-2 py-1 rounded-lg hover:bg-slate-800 text-[11px] font-semibold transition cursor-pointer"
+              >
+                Collapse All
+              </button>
+            </div>
+          </div>
+
           <div className="space-y-3">
             {DOMAIN_GROUPS.map((domain) => {
               const domainTopics = CHALLENGE_TOPICS.filter(t => t.category === domain.category);
               if (domainTopics.length === 0) return null;
 
-              // Filter out completed topics if hideCompleted is active
-              const visibleTopics = domainTopics.filter(t => {
-                if (selectedDifficulty !== 'all' && t.defaultDifficulty !== selectedDifficulty) return false;
-                if (hideCompleted && isTopicCompleted(t.topicId)) return false;
-                return true;
-              });
-
+              // Filter out completed topics as required
+              const visibleTopics = domainTopics.filter(t => !isTopicCompleted(t.topicId));
               const completedInDomain = domainTopics.filter(t => isTopicCompleted(t.topicId)).length;
               const isAllDomainCompleted = completedInDomain === domainTopics.length;
               const isOpen = Boolean(openFolds[domain.id]);
@@ -470,7 +731,6 @@ export const ChallengeDashboard: React.FC<ChallengeDashboardProps> = ({
                   key={domain.id}
                   className="bg-slate-900/90 border border-slate-800 rounded-2xl overflow-hidden shadow-lg transition-all"
                 >
-                  {/* FOLD HEADER (Click to expand/collapse) */}
                   <div
                     onClick={() => toggleFold(domain.id)}
                     className="p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3 cursor-pointer hover:bg-slate-800/40 transition select-none"
@@ -486,11 +746,11 @@ export const ChallengeDashboard: React.FC<ChallengeDashboardProps> = ({
                           </h3>
                           {isAllDomainCompleted ? (
                             <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" /> Mastered ({completedInDomain}/{domainTopics.length})
+                              <CheckCircle2 className="w-3 h-3" /> Mastered ({completedInDomain}/{domainTopics.length} moved to Completed)
                             </span>
                           ) : (
                             <span className="bg-slate-800 text-slate-300 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-slate-700">
-                              {visibleTopics.length} available • {completedInDomain}/{domainTopics.length} done
+                              {visibleTopics.length} available • {completedInDomain} moved to completed
                             </span>
                           )}
                         </div>
@@ -501,44 +761,29 @@ export const ChallengeDashboard: React.FC<ChallengeDashboardProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleLaunchRandomInDomain(domain);
-                        }}
-                        className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold px-3 py-1.5 rounded-xl border border-slate-700 flex items-center gap-1.5 transition cursor-pointer"
-                      >
-                        <Dices className="w-3.5 h-3.5 text-cyan-400" />
-                        <span className="hidden sm:inline">Surprise Domain Case</span>
-                      </button>
-
                       <div className="p-1 rounded-lg bg-slate-800/60 text-slate-400">
                         {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </div>
                     </div>
                   </div>
 
-                  {/* FOLD BODY (Cases Grid) */}
                   {isOpen && (
                     <div className="p-3 sm:p-4 pt-0 border-t border-slate-800/80">
                       {visibleTopics.length === 0 ? (
                         <div className="py-6 text-center text-xs text-slate-400 space-y-2">
-                          <p>All challenges in this domain have been completed and hidden from the active list.</p>
+                          <p className="text-emerald-400 font-bold">✓ All challenges in this domain have been completed and moved to the Completed Archive.</p>
                           <button
-                            onClick={() => setHideCompleted(false)}
+                            onClick={() => setDashboardTab('archive')}
                             className="text-cyan-400 hover:underline font-semibold"
                           >
-                            Click to show completed challenges
+                            View them in Completed Archive
                           </button>
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-3">
-                          {visibleTopics.map(topic => {
+                          {visibleTopics.map((topic, tIndex) => {
                             const currentVarIndex = activeVariationMap[topic.topicId] !== undefined ? activeVariationMap[topic.topicId] : 0;
                             const currentVar = topic.variations[currentVarIndex] || topic.variations[0];
-                            const hasPlayed = isTopicCompleted(topic.topicId);
-                            const currentVarDone = isVariationCompleted(topic.topicId, currentVarIndex);
 
                             return (
                               <div
@@ -548,13 +793,8 @@ export const ChallengeDashboard: React.FC<ChallengeDashboardProps> = ({
                                 <div className="space-y-2">
                                   <div className="flex items-center justify-between gap-1 text-[10px]">
                                     <span className="bg-slate-800 text-slate-300 px-2 py-0.5 rounded-md font-semibold capitalize">
-                                      {topic.defaultDifficulty}
+                                      #{tIndex + 1} • {topic.defaultDifficulty}
                                     </span>
-                                    {hasPlayed && (
-                                      <span className="text-emerald-400 font-bold flex items-center gap-1">
-                                        <CheckCircle2 className="w-3 h-3" /> Done
-                                      </span>
-                                    )}
                                   </div>
 
                                   <div>
@@ -575,37 +815,23 @@ export const ChallengeDashboard: React.FC<ChallengeDashboardProps> = ({
                                   <div className="pt-1">
                                     <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
                                       <span>Variation (1 of 5):</span>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleLaunchRandomVariation(topic)}
-                                        className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer font-semibold"
-                                      >
-                                        <Dices className="w-3 h-3" />
-                                        <span>Random</span>
-                                      </button>
                                     </div>
 
                                     <div className="flex items-center gap-1">
-                                      {topic.variations.map((v, idx) => {
-                                        const varDone = isVariationCompleted(topic.topicId, idx);
-                                        return (
-                                          <button
-                                            key={v.variationIndex}
-                                            type="button"
-                                            onClick={() => handleSelectVariation(topic.topicId, idx)}
-                                            className={`flex-1 py-1 rounded text-[11px] font-bold transition cursor-pointer flex items-center justify-center gap-0.5 ${
-                                              currentVarIndex === idx
-                                                ? 'bg-cyan-600 text-white shadow-sm'
-                                                : varDone
-                                                ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/30'
-                                                : 'bg-slate-800 text-slate-400 hover:text-white'
-                                            }`}
-                                          >
-                                            <span>V{idx + 1}</span>
-                                            {varDone && <Check className="w-2.5 h-2.5 text-emerald-400" />}
-                                          </button>
-                                        );
-                                      })}
+                                      {topic.variations.map((v, idx) => (
+                                        <button
+                                          key={v.variationIndex}
+                                          type="button"
+                                          onClick={() => handleSelectVariation(topic.topicId, idx)}
+                                          className={`flex-1 py-1 rounded text-[11px] font-bold transition cursor-pointer flex items-center justify-center gap-0.5 ${
+                                            currentVarIndex === idx
+                                              ? 'bg-cyan-600 text-white shadow-sm'
+                                              : 'bg-slate-800 text-slate-400 hover:text-white'
+                                          }`}
+                                        >
+                                          <span>V{idx + 1}</span>
+                                        </button>
+                                      ))}
                                     </div>
                                   </div>
                                 </div>
@@ -625,7 +851,7 @@ export const ChallengeDashboard: React.FC<ChallengeDashboardProps> = ({
                                     onClick={() => handleLaunchTopic(topic)}
                                     className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs px-3 py-1.5 rounded-xl transition flex items-center gap-1 cursor-pointer shadow-sm"
                                   >
-                                    <span>{currentVarDone ? 'Replay' : 'Launch'}</span>
+                                    <span>Launch</span>
                                     <ArrowRight className="w-3 h-3" />
                                   </button>
                                 </div>
@@ -643,115 +869,19 @@ export const ChallengeDashboard: React.FC<ChallengeDashboardProps> = ({
         </div>
       )}
 
-      {/* TAB CONTENT 2: FEATURED & QUICK CASES */}
-      {dashboardTab === 'featured' && (
-        <div className="space-y-5 animate-fade-in">
-          {/* Daily & Weekly Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Daily Challenge */}
-            <div className="bg-gradient-to-br from-slate-900 to-slate-900/90 border border-cyan-500/30 rounded-2xl p-5 shadow-lg relative overflow-hidden flex flex-col justify-between">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
-                    <Calendar className="w-3 h-3" /> Today's Random Daily Challenge
-                  </span>
-                  <span className="text-amber-400 font-bold text-xs flex items-center gap-1">
-                    <Zap className="w-3.5 h-3.5" /> +200 XP
-                  </span>
-                </div>
-                <h2 className="font-bold text-white text-base">{dailyCase.title}</h2>
-                <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">{dailyCase.presentingComplaint}</p>
-              </div>
-
-              <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs text-slate-400">
-                  <span className="capitalize text-slate-300 font-medium">{dailyCase.difficulty}</span>
-                  {dailyCase.timeLimitSeconds && (
-                    <span className="flex items-center gap-1 text-red-400 font-semibold">
-                      <Clock className="w-3 h-3" /> {dailyCase.timeLimitSeconds}s
-                    </span>
-                  )}
-                </div>
-                <button
-                  onClick={() => onStartCase(dailyCase)}
-                  className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-cyan-950/40"
-                >
-                  <span>Play Today's Case</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Weekly Challenge */}
-            <div className="bg-gradient-to-br from-slate-900 to-slate-900/90 border border-purple-500/30 rounded-2xl p-5 shadow-lg relative overflow-hidden flex flex-col justify-between">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
-                    <Trophy className="w-3 h-3" /> Weekly Master Scenario
-                  </span>
-                  <span className="text-purple-400 font-bold text-xs flex items-center gap-1">
-                    <Zap className="w-3.5 h-3.5" /> +350 XP
-                  </span>
-                </div>
-                <h2 className="font-bold text-white text-base">{weeklyCase.title}</h2>
-                <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">{weeklyCase.presentingComplaint}</p>
-              </div>
-
-              <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs text-slate-400">
-                  <span className="capitalize text-slate-300 font-medium">{weeklyCase.difficulty}</span>
-                  {weeklyCase.timeLimitSeconds && (
-                    <span className="flex items-center gap-1 text-red-400 font-semibold">
-                      <Clock className="w-3 h-3" /> {weeklyCase.timeLimitSeconds}s Timed
-                    </span>
-                  )}
-                </div>
-                <button
-                  onClick={() => onStartCase(weeklyCase)}
-                  className="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-purple-950/40"
-                >
-                  <span>Play Weekly Case</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* AI Case Synthesizer Box */}
-          <div className="bg-slate-900/90 border border-indigo-500/30 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="space-y-1 text-center sm:text-left">
-              <div className="flex items-center justify-center sm:justify-start gap-1.5 text-indigo-400 font-bold text-xs">
-                <Sparkles className="w-4 h-4" />
-                <span>AI Clinical Simulation Engine</span>
-              </div>
-              <h3 className="font-bold text-white text-base">Generate Novel Dynamic Trauma Case</h3>
-              <p className="text-xs text-slate-400 max-w-lg">
-                Create an on-demand bespoke case with randomized patient vitals, complex poly-trauma, and unique contraindications.
-              </p>
-            </div>
-
-            <button
-              onClick={() => onGenerateAiCase('trauma', 'intermediate')}
-              disabled={isGeneratingAi}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition flex items-center gap-2 shadow-lg shadow-indigo-950/50 cursor-pointer shrink-0"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>{isGeneratingAi ? 'Synthesizing...' : 'Generate AI Case'}</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* TAB CONTENT 3: COMPLETED ARCHIVE */}
+      {/* TAB CONTENT 3: COMPLETED ARCHIVE (Completed Challenges Page) */}
       {dashboardTab === 'archive' && (
         <div className="space-y-4 animate-fade-in">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
             <div>
-              <h3 className="font-bold text-white text-base">Completed Clinical Challenges</h3>
-              <p className="text-xs text-slate-400">Review your past scores, times, and replay to perfect your clinical mastery</p>
+              <h3 className="font-bold text-white text-base">Completed Challenges Archive</h3>
+              <p className="text-xs text-slate-400">
+                All challenges completed on the dashboard page are archived here. You can review your debrief results or replay any case to perfect your technique.
+              </p>
             </div>
-            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-full">
-              {profile.casesCompleted} Total Runs
+            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 rounded-full flex items-center gap-1.5 shrink-0">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              {completedCount} Completed Challenges
             </span>
           </div>
 
@@ -759,7 +889,7 @@ export const ChallengeDashboard: React.FC<ChallengeDashboardProps> = ({
             <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-8 text-center text-xs text-slate-400 space-y-2">
               <Trophy className="w-10 h-10 mx-auto text-slate-600" />
               <p className="font-bold text-slate-300">No completed challenges recorded yet.</p>
-              <p>Complete any clinical scenario to archive your score and debrief results here.</p>
+              <p>Complete any clinical scenario on the dashboard to archive your score and debrief results here.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -780,18 +910,24 @@ export const ChallengeDashboard: React.FC<ChallengeDashboardProps> = ({
                     </div>
 
                     <h4 className="font-bold text-white text-sm line-clamp-1">{record.caseTitle}</h4>
-                    <div className="text-[10px] text-cyan-400 capitalize">{record.category.replace('_', ' ')}</div>
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="text-cyan-400 capitalize">{record.category.replace('_', ' ')}</span>
+                      <span className="text-slate-400 capitalize">{record.patientOutcome.replace('_', ' ')}</span>
+                    </div>
                   </div>
 
                   <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
                     <span className="text-amber-400 font-mono text-[11px]">+{record.xpEarned} XP earned</span>
                     <button
                       onClick={() => {
-                        const found = CHALLENGE_TOPICS.find(t => record.caseId.includes(t.topicId));
-                        if (found) {
-                          onStartCase(buildCaseFromTopicAndVariation(found, 0));
+                        const found = dashboardCases.find(c => c.id === record.caseId) || 
+                          CHALLENGE_TOPICS.find(t => record.caseId.includes(t.topicId));
+                        if (found && 'rubric' in found) {
+                          onStartCase(found as ClinicalCase);
+                        } else if (found) {
+                          onStartCase(buildCaseFromTopicAndVariation(found as typeof CHALLENGE_TOPICS[0], 0));
                         } else {
-                          onStartCase(CHALLENGE_TOPICS[0].variations[0] ? buildCaseFromTopicAndVariation(CHALLENGE_TOPICS[0], 0) : getRandomChallengeCase());
+                          onStartCase(getRandomChallengeCase());
                         }
                       }}
                       className="text-cyan-400 hover:text-white font-bold flex items-center gap-1 cursor-pointer"

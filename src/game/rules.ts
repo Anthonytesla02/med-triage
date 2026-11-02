@@ -237,9 +237,37 @@ export function evaluateCasePerformance(
     xpEarned = 25;
   }
 
+  // Bonus XP for Daily and Weekly Challenges
+  if (score >= 70 && !isCriticalOverride) {
+    if (clinicalCase.bonusXp) {
+      xpEarned += clinicalCase.bonusXp;
+    } else if (clinicalCase.isWeeklyChallenge) {
+      xpEarned += 1200;
+    } else if (clinicalCase.isDailyChallenge) {
+      xpEarned += 600;
+    }
+  }
+
   // Achievement Badges
   const unlockedBadges: string[] = [];
   const existingBadges = new Set(currentProfile?.unlockedBadges || []);
+
+  // Rare badges for Daily and Weekly super-hard crises
+  if (clinicalCase.isDailyChallenge && score >= 70 && !isCriticalOverride && !existingBadges.has('rare_daily_titan')) {
+    unlockedBadges.push('rare_daily_titan');
+  }
+
+  if (clinicalCase.isWeeklyChallenge && score >= 70 && !isCriticalOverride && !existingBadges.has('rare_weekly_oracle')) {
+    unlockedBadges.push('rare_weekly_oracle');
+  }
+
+  if (difficulty === 'expert' && score >= 80 && !isCriticalOverride && !existingBadges.has('rare_super_hard_resuscitation')) {
+    unlockedBadges.push('rare_super_hard_resuscitation');
+  }
+
+  if (clinicalCase.specialBadgeReward && score >= 70 && !isCriticalOverride && !existingBadges.has(clinicalCase.specialBadgeReward)) {
+    unlockedBadges.push(clinicalCase.specialBadgeReward);
+  }
 
   if (appliedSupplyIds.has('gloves') && !sequencingErrors.some(e => e.includes('Infection control')) && !existingBadges.has('badge_clean_hands')) {
     unlockedBadges.push('badge_clean_hands');
@@ -400,6 +428,27 @@ export const INITIAL_IDP_PROFILE: IdentityProfile = {
 };
 
 export const BADGE_DEFINITIONS = [
+  {
+    id: 'rare_daily_titan',
+    title: 'Daily Crisis Titan',
+    description: 'Conquered a high-stakes emergency daily crisis under maximum rubric rigor (Rare Badge).',
+    iconName: 'Crown',
+    category: 'emergency'
+  },
+  {
+    id: 'rare_weekly_oracle',
+    title: 'Weekly Master Oracle',
+    description: 'Mastered the apex weekly emergency simulation under extreme clinical conditions (Very Rare Badge).',
+    iconName: 'Trophy',
+    category: 'emergency'
+  },
+  {
+    id: 'rare_super_hard_resuscitation',
+    title: 'Apex Resuscitator',
+    description: 'Stabilized an ultra-hard expert category poly-trauma crisis with flawless protocol safety.',
+    iconName: 'Flame',
+    category: 'trauma'
+  },
   {
     id: 'badge_clean_hands',
     title: 'Clean Hands',

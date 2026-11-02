@@ -172,6 +172,11 @@ export interface ClinicalCase {
     commonPitfalls: string;
     safetyPearls: string;
   };
+  createdAt?: number; // Epoch timestamp in ms for oldest-to-newest sorting
+  isDailyChallenge?: boolean;
+  isWeeklyChallenge?: boolean;
+  bonusXp?: number;
+  specialBadgeReward?: string;
 }
 
 export interface CaseEvaluationResult {

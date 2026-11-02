@@ -10,7 +10,14 @@ import {
   INITIAL_IDP_PROFILE, 
   updateProfileWithResult 
 } from './game/rules';
-import { CASE_LIBRARY } from './data/caseLibrary';
+import { 
+  CASE_LIBRARY, 
+  generateBatch5Challenges, 
+  getDailyChallengeCase, 
+  getWeeklyChallengeCase, 
+  getDateKey, 
+  getWeekKey 
+} from './data/caseLibrary';
 import { ChallengeDashboard } from './components/challenge/ChallengeDashboard';
 import { SimulationView } from './components/challenge/SimulationView';
 import { DebriefView } from './components/challenge/DebriefView';
@@ -30,6 +37,7 @@ import {
 
 const STORAGE_PROFILE_KEY = 'pharm_emerg_idp_profile_v2';
 const STORAGE_SESSION_KEY = 'pharm_emerg_in_flight_case';
+const STORAGE_CASES_KEY = 'pharm_emerg_dashboard_cases_v5';
 
 export default function App() {
   // Navigation state
@@ -53,7 +61,49 @@ export default function App() {
   const [hasUnfinishedSession, setHasUnfinishedSession] = useState<boolean>(() => {
     return Boolean(localStorage.getItem(STORAGE_SESSION_KEY));
   });
-  const [isGeneratingAi, setIsGeneratingAi] = useState<boolean>(false);
+  const [isGeneratingBatch, setIsGeneratingBatch] = useState<boolean>(false);
+
+  // Dashboard Cases State: All challenges (base library + generated batches)
+  const [dashboardCases, setDashboardCases] = useState<ClinicalCase[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_CASES_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to parse dashboard cases from localStorage:', e);
+    }
+    return CASE_LIBRARY;
+  });
+
+  // Daily and Weekly challenge tracking with automatic date rollover
+  const [currentDateKey, setCurrentDateKey] = useState<string>(() => getDateKey(new Date()));
+  const [currentWeekKey, setCurrentWeekKey] = useState<string>(() => getWeekKey(new Date()));
+  const [dailyCase, setDailyCase] = useState<ClinicalCase>(() => getDailyChallengeCase(new Date()));
+  const [weeklyCase, setWeeklyCase] = useState<ClinicalCase>(() => getWeeklyChallengeCase(new Date()));
+
+  // Periodically check if the date or week changed to automatically roll over challenges
+  useEffect(() => {
+    const checkRollover = () => {
+      const now = new Date();
+      const todayKey = getDateKey(now);
+      const weekKey = getWeekKey(now);
+
+      if (todayKey !== currentDateKey) {
+        setCurrentDateKey(todayKey);
+        setDailyCase(getDailyChallengeCase(now));
+      }
+
+      if (weekKey !== currentWeekKey) {
+        setCurrentWeekKey(weekKey);
+        setWeeklyCase(getWeeklyChallengeCase(now));
+      }
+    };
+
+    const interval = setInterval(checkRollover, 15000); // Check every 15 seconds
+    return () => clearInterval(interval);
+  }, [currentDateKey, currentWeekKey]);
 
   // Sync profile to localStorage
   useEffect(() => {
@@ -64,14 +114,23 @@ export default function App() {
     }
   }, [profile]);
 
+  // Sync dashboard cases to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_CASES_KEY, JSON.stringify(dashboardCases));
+    } catch (e) {
+      console.warn('Failed to save dashboard cases to localStorage:', e);
+    }
+  }, [dashboardCases]);
+
   // Support ?autostart=1 query param as per Ultra Mode instructions!
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('autostart') === '1') {
-      const firstCase = CASE_LIBRARY[0];
+      const firstCase = dashboardCases[0] || CASE_LIBRARY[0];
       handleStartCase(firstCase);
     }
-  }, []);
+  }, [dashboardCases]);
 
   const handleStartCase = (clinicalCase: ClinicalCase) => {
     setActiveCase(clinicalCase);
@@ -90,7 +149,7 @@ export default function App() {
       const saved = localStorage.getItem(STORAGE_SESSION_KEY);
       if (saved) {
         const { caseId } = JSON.parse(saved);
-        const found = CASE_LIBRARY.find(c => c.id === caseId) || CASE_LIBRARY[0];
+        const found = dashboardCases.find(c => c.id === caseId) || CASE_LIBRARY.find(c => c.id === caseId) || CASE_LIBRARY[0];
         handleStartCase(found);
       }
     } catch (e) {
@@ -133,29 +192,21 @@ export default function App() {
       setSimState('dashboard');
       return;
     }
-    const currentIndex = CASE_LIBRARY.findIndex(c => c.id === activeCase.id);
-    const nextIndex = (currentIndex + 1) % CASE_LIBRARY.length;
-    handleStartCase(CASE_LIBRARY[nextIndex]);
+    const currentIndex = dashboardCases.findIndex(c => c.id === activeCase.id);
+    const nextIndex = (currentIndex + 1) % dashboardCases.length;
+    handleStartCase(dashboardCases[nextIndex] || CASE_LIBRARY[0]);
   };
 
-  const handleGenerateAiCase = async (category: CaseCategory, difficulty: DifficultyLevel) => {
-    setIsGeneratingAi(true);
+  // Generates 5 new distinct case challenges and appends them to dashboard cases
+  const handleGenerateBatch5 = () => {
+    setIsGeneratingBatch(true);
     try {
-      const res = await fetch('/api/generate-case', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category, difficulty })
-      });
-      const data = await res.json();
-      if (data.case) {
-        handleStartCase(data.case);
-      }
-    } catch (e) {
-      console.warn('AI generation API failed, picking from library:', e);
-      const filtered = CASE_LIBRARY.filter(c => c.category === category);
-      handleStartCase(filtered[0] || CASE_LIBRARY[0]);
+      const newFive = generateBatch5Challenges(Date.now());
+      setDashboardCases(prev => [...prev, ...newFive]);
+    } catch (err) {
+      console.error('Error generating batch 5 challenges:', err);
     } finally {
-      setIsGeneratingAi(false);
+      setIsGeneratingBatch(false);
     }
   };
 
@@ -261,8 +312,11 @@ export default function App() {
                 onStartCase={handleStartCase}
                 hasUnfinishedSession={hasUnfinishedSession}
                 onResumeSession={handleResumeSession}
-                onGenerateAiCase={handleGenerateAiCase}
-                isGeneratingAi={isGeneratingAi}
+                dashboardCases={dashboardCases}
+                onGenerateBatch5={handleGenerateBatch5}
+                isGeneratingBatch={isGeneratingBatch}
+                dailyCase={dailyCase}
+                weeklyCase={weeklyCase}
               />
             )}
 

@@ -6,7 +6,14 @@ import {
   updateProfileWithResult, 
   INITIAL_IDP_PROFILE 
 } from './rules';
-import { CASE_LIBRARY, CHALLENGE_TOPICS, buildCaseFromTopicAndVariation } from '../data/caseLibrary';
+import { 
+  CASE_LIBRARY, 
+  CHALLENGE_TOPICS, 
+  buildCaseFromTopicAndVariation,
+  getDailyChallengeCase,
+  getWeeklyChallengeCase,
+  generateBatch5Challenges
+} from '../data/caseLibrary';
 import { AppliedAction } from '../types/clinical';
 
 test('calculateLevelFromXp calculates correct level and remaining XP', () => {
@@ -184,3 +191,89 @@ test('Each challenge topic has up to 5 distinct clinical variations', () => {
     assert.notEqual(var1.patient.name, var2.patient.name);
   }
 });
+
+test('Daily challenge is strictly hard to super hard, awards plenty XP and rare_daily_titan badge', () => {
+  const wednesday = new Date('2026-11-04T10:00:00');
+  const dailyCase = getDailyChallengeCase(wednesday);
+  
+  assert.ok(dailyCase.difficulty === 'advanced' || dailyCase.difficulty === 'expert');
+  assert.ok(dailyCase.bonusXp && dailyCase.bonusXp >= 700);
+  assert.equal(dailyCase.specialBadgeReward, 'rare_daily_titan');
+  assert.equal(dailyCase.isDailyChallenge, true);
+
+  // Evaluate dummy successful run on dailyCase
+  const actions: AppliedAction[] = dailyCase.rubric.requiredSupplyIds.map((reqId, idx) => ({
+    id: `act-${idx}`,
+    supplyId: reqId,
+    supplyName: reqId,
+    timestampSeconds: idx * 5,
+    isEssential: true,
+    isHarmful: false,
+    isContraindicated: false,
+    clinicalFeedback: 'Standard guideline step performed.'
+  }));
+
+  const result = evaluateCasePerformance(dailyCase, actions, 40, false, INITIAL_IDP_PROFILE);
+  assert.ok(result.score >= 80);
+  assert.ok(result.xpEarned >= 700, 'Must award plenty of XP for daily challenge');
+  assert.ok(result.unlockedBadges.includes('rare_daily_titan'), 'Must unlock rare_daily_titan');
+});
+
+test('Daily challenge automatically generates new case when date changes (rollover test)', () => {
+  const wednesday = new Date('2026-11-04T12:00:00');
+  const thursday = new Date('2026-11-05T12:00:00');
+
+  const wednesdayCase = getDailyChallengeCase(wednesday);
+  const thursdayCase = getDailyChallengeCase(thursday);
+
+  assert.equal(wednesdayCase.id, 'daily-2026-11-04');
+  assert.equal(thursdayCase.id, 'daily-2026-11-05');
+  assert.notEqual(wednesdayCase.id, thursdayCase.id, 'Wednesday challenge must rollover to Thursday');
+});
+
+test('Weekly challenge is strictly super hard (expert), awards 1500 XP and rare_weekly_oracle badge', () => {
+  const thisWeek = new Date('2026-11-02T10:00:00');
+  const weeklyCase = getWeeklyChallengeCase(thisWeek);
+
+  assert.equal(weeklyCase.difficulty, 'expert', 'Weekly challenge must be super hard (expert)');
+  assert.equal(weeklyCase.bonusXp, 1500);
+  assert.equal(weeklyCase.specialBadgeReward, 'rare_weekly_oracle');
+  assert.equal(weeklyCase.isWeeklyChallenge, true);
+  assert.equal(weeklyCase.timeLimitSeconds, 60);
+
+  const actions: AppliedAction[] = weeklyCase.rubric.requiredSupplyIds.map((reqId, idx) => ({
+    id: `w-act-${idx}`,
+    supplyId: reqId,
+    supplyName: reqId,
+    timestampSeconds: idx * 5,
+    isEssential: true,
+    isHarmful: false,
+    isContraindicated: false,
+    clinicalFeedback: 'Guideline step.'
+  }));
+
+  const result = evaluateCasePerformance(weeklyCase, actions, 30, false, INITIAL_IDP_PROFILE);
+  assert.ok(result.score >= 80);
+  assert.ok(result.xpEarned >= 1500, 'Must award massive XP for weekly super-hard challenge');
+  assert.ok(result.unlockedBadges.includes('rare_weekly_oracle'), 'Must unlock rare_weekly_oracle');
+});
+
+test('generateBatch5Challenges generates 5 distinct cases with chronological timestamps', () => {
+  const now = Date.now();
+  const batch = generateBatch5Challenges(now);
+
+  assert.equal(batch.length, 5, 'Must generate exactly 5 challenges');
+  
+  // Verify timestamps are ordered oldest to newest
+  for (let i = 0; i < batch.length - 1; i++) {
+    assert.ok(
+      (batch[i].createdAt || 0) <= (batch[i + 1].createdAt || 0),
+      `Challenge ${i} must be older than or equal to challenge ${i + 1}`
+    );
+  }
+
+  // Verify unique IDs
+  const idSet = new Set(batch.map(c => c.id));
+  assert.equal(idSet.size, 5, 'All 5 generated cases must have unique IDs');
+});
+
