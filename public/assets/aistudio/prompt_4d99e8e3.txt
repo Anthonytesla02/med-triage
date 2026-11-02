@@ -1,0 +1,1184 @@
+PROJECT: BUILD A GAMIFIED 2D PHARMACY TRAUMA AND EMERGENCY SIMULATOR
+
+1. Your role
+
+Act as a senior full-stack developer, medical simulation engineer, clinical education specialist, UI/UX designer, game developer, and AI integration engineer.
+
+Your task is to fully implement an interactive, gamified, 2D pharmacy trauma and emergency simulator inside my existing application.
+
+This is an extension of my existing app, not a new application.
+
+Before making changes, inspect the existing repository and understand its architecture, features, database, API integrations, and user progression systems.
+
+The existing application already has a Learning tab that generates written clinical case studies. I want to preserve that functionality while building a substantially different experience in the Challenge tab.
+
+The application uses my existing Grok API integration and has a clinical knowledge base that includes the Standard Treatment Guidelines (STG) and a drug list.
+
+Reuse these resources wherever appropriate.
+
+Do not replace existing functionality unnecessarily, introduce a competing user profile system, or rebuild unrelated parts of the application.
+
+Primary objective
+
+Build a mobile-friendly, two-dimensional interactive medical simulation where users can:
+
+- Encounter visually represented patients.
+- Examine injuries and recognize medical emergencies.
+- Interact directly with patient illustrations.
+- Select medical supplies and apply them to the appropriate body parts.
+- Perform first-aid procedures in the correct sequence.
+- Assess patients and make clinical decisions.
+- Select medications and specify appropriate administration details when necessary.
+- Experience simulated patient responses to their decisions.
+- Complete time-sensitive emergency challenges.
+- Receive detailed performance evaluations.
+- Earn experience points, levels, and achievements.
+- Improve their existing Identity Profile (IDP).
+- Track their performance across multiple cases.
+
+The finished experience must be functional, not merely a visual mockup.
+
+Every interactive control must have a defined purpose, and the underlying application logic must respond appropriately to the user's actions.
+
+
+---
+
+2. Preserve the existing application
+
+Before writing code, inspect the existing project.
+
+Identify:
+
+1. The current Learning tab and its case-generation functionality.
+2. The current Challenge tab, if one exists.
+3. The application's navigation and routing.
+4. The existing Grok API integration.
+5. The location and format of the STG knowledge base.
+6. The available drug list and medication data.
+7. The existing Identity Profile and scoring system.
+8. The database and authentication system.
+9. Existing user XP, achievements, levels, and progress tracking.
+10. The application's current UI framework and design system.
+
+Use the existing architecture wherever possible.
+
+Non-negotiable requirements
+
+- Preserve the existing Learning tab.
+- Preserve existing case-study functionality.
+- Do not replace the current application with a separate project.
+- Reuse the existing Grok integration.
+- Reuse the existing STG and drug database.
+- Integrate Challenge progression with the existing IDP.
+- Preserve unrelated features.
+- Make the implementation compatible with the existing technology stack.
+
+If an essential capability is missing, implement it in a way that fits the existing architecture.
+
+Do not assume that a backend, database, or particular framework exists until you inspect the repository.
+
+
+---
+
+3. Build a dedicated Challenge tab
+
+The Challenge tab must offer a fundamentally different experience from the Learning tab.
+
+The Learning tab presents written cases that users read, analyze, and answer.
+
+The Challenge tab should present interactive clinical situations that users actively manage.
+
+Challenge home screen
+
+Create a polished, game-inspired dashboard featuring:
+
+- A prominent Start Challenge button.
+- A Continue Challenge button when an unfinished session exists.
+- Daily challenges.
+- Weekly challenges.
+- A randomly generated case option.
+- Available case categories.
+- Difficulty selection.
+- Timed emergency indicators.
+- Trauma procedure indicators.
+- Current XP and level.
+- Completed case count.
+- Success rate.
+- Category mastery.
+- Unlocked badges.
+- Recent challenge history.
+
+Suggested difficulty levels:
+
+1. Beginner.
+2. Intermediate.
+3. Advanced.
+4. Expert.
+
+Difficulty should reflect the complexity of clinical decisions, the number of relevant safety considerations, the procedure requirements, and the urgency of the case.
+
+Do not increase difficulty simply by introducing obscure or clinically unrealistic scenarios.
+
+The dashboard must work well on small Android screens.
+
+Use touch-friendly controls, readable text, clear visual feedback, and efficient layouts.
+
+
+---
+
+4. Restrict the case-generation engine to the intended categories
+
+The Challenge tab must generate cases only within the following categories.
+
+A. Trauma and physical injuries
+
+- Minor cuts and lacerations.
+- Abrasions.
+- Minor puncture wounds.
+- Minor bleeding.
+- Burns and scalds.
+- Bruises.
+- Appropriate minor sprain and strain scenarios.
+- Wound contamination.
+- Injuries requiring referral because they exceed pharmacy-level management.
+
+B. Acute medical emergencies
+
+- Asthma attacks.
+- Acute breathing difficulties.
+- Anaphylaxis.
+- Severe allergic reactions.
+- Seizures.
+- Other emergencies where the pharmacy has a defined role in initial assessment, first aid, emergency activation, or referral.
+
+C. Pharmaceutical emergencies
+
+- Suspected adverse drug reactions.
+- Medication errors.
+- Incorrect medication administration.
+- Suspected overdoses.
+- Contraindications.
+- Medication allergies.
+- Clinically significant drug interactions.
+- Medication-related emergencies requiring immediate intervention or referral.
+
+Do not generate unrelated general medical examinations or routine disease quizzes.
+
+Routine conditions such as malaria or urinary tract infections should not become the primary focus of this Challenge tab unless a scenario specifically concerns a relevant medication emergency or another explicitly supported emergency situation.
+
+The existing Learning tab can continue handling its broader clinical case studies.
+
+
+---
+
+5. Use a 2D interactive game engine
+
+Build the simulator as a two-dimensional interactive experience using patient illustrations, clickable objects, selectable supplies, and visual treatment states.
+
+Do not build a 3D environment.
+
+Do not make the entire experience a sequence of multiple-choice questions.
+
+The user must interact directly with the visual scenario.
+
+Recommended visual implementation
+
+Inspect the existing framework and select the simplest reliable approach that fits the project.
+
+Depending on the existing architecture, suitable approaches may include:
+
+- HTML, CSS, and JavaScript.
+- SVG illustrations with interactive regions.
+- Canvas-based rendering.
+- An existing React-based interface, if the project already uses React.
+- A lightweight 2D game library, if justified by the current architecture.
+
+Do not introduce a large game engine unnecessarily.
+
+The goal is a responsive 2D simulator that performs well on mobile devices.
+
+Interactive patient scene
+
+Each appropriate case should display a visual scene containing:
+
+- The patient or patients.
+- The affected body part.
+- Visible symptoms or injury features.
+- Relevant medical supplies.
+- A patient information panel.
+- A current objective.
+- A progress indicator.
+- A timer when appropriate.
+- A contextual action panel.
+
+The user should be able to tap interactive regions of the patient illustration.
+
+For example, in a wound-care case, the affected leg or hand should be selectable.
+
+Selecting an object should allow the user to perform a relevant action.
+
+Where practical, support dragging supplies onto the correct body region. However, the essential functionality must also work through simple tap-to-select and tap-to-apply interactions.
+
+Do not make drag-and-drop mandatory if it creates problems on small touchscreens.
+
+Important implementation principle
+
+The application must track what the user does, not merely what the user claims to have done.
+
+If the user applies a dressing, the application must record that action and update the visual state.
+
+If the user selects an inappropriate treatment, the application must record the error and apply the appropriate clinical and scoring consequences.
+
+The visual scene, procedure state, clinical evaluation, and scoring system must remain synchronized.
+
+
+---
+
+6. Create reusable patient and injury illustrations
+
+The simulator needs suitable visual assets.
+
+Use existing assets if the repository already contains appropriate illustrations.
+
+Otherwise, create or integrate a reusable collection of 2D patient illustrations.
+
+Patient avatars
+
+Support:
+
+- Adult male patients.
+- Adult female patients.
+- Children.
+- Elderly patients.
+- Caregivers.
+- Multiple characters in the same scenario.
+
+For example, a mother bringing an injured child into a pharmacy should display both the mother and the child.
+
+The mother should have a separate avatar from the child.
+
+The application must clearly distinguish the caregiver from the actual patient.
+
+Injury illustrations
+
+Create or source appropriate illustrations for:
+
+- Cuts on the hand.
+- Cuts on the arm.
+- Cuts on the leg.
+- Abrasions.
+- Minor burns.
+- More serious burns requiring referral.
+- Other suitable injuries.
+
+Emergency illustrations
+
+Where appropriate, provide visual indicators of:
+
+- Breathing difficulty.
+- Allergic reactions.
+- Anaphylaxis.
+- Seizure activity.
+- Deterioration in the patient's condition.
+
+Represent symptoms in a clinically appropriate way.
+
+Avoid graphic gore or unnecessarily disturbing imagery.
+
+Reusable visual states
+
+Do not generate a completely new image every time a user starts a case.
+
+Instead, create reusable visual components that can represent different patient states.
+
+For example:
+
+Patient avatar → Injury overlay → Initial condition → Treatment actions → Updated condition → Final outcome
+
+An injury illustration might change as the user performs appropriate actions.
+
+A wound dressing should appear after it is applied.
+
+A visual indicator of bleeding may change after appropriate bleeding control.
+
+A patient status indicator may change when the simulated clinical condition improves or deteriorates.
+
+These transitions must be driven by application logic.
+
+They must not be merely decorative animations that ignore the user's actual decisions.
+
+Image asset handling
+
+If image generation is needed, identify the exact assets required and their intended roles.
+
+Support reusable images stored in the project's existing asset directory or storage system.
+
+Do not make the entire application dependent on generating new images through the AI API during every challenge.
+
+The simulator should still function when the AI service is temporarily unavailable, provided validated case data and the necessary visual assets are available.
+
+
+---
+
+7. Generate clinically coherent cases
+
+Use the existing Grok integration to generate varied case scenarios.
+
+However, the AI must generate structured case data rather than unrestricted text that the application cannot reliably evaluate.
+
+Every case should include:
+
+- Unique case ID.
+- Case title.
+- Case category.
+- Difficulty.
+- Patient identity and avatar configuration.
+- Patient age.
+- Relevant medical history.
+- Current medications.
+- Known allergies.
+- Presenting complaint.
+- Symptoms.
+- Visible findings.
+- Relevant vital signs, when appropriate.
+- Time of onset.
+- Relevant patient or caregiver statements.
+- Available medical supplies.
+- Case objectives.
+- Required assessment actions.
+- Expected safe management plan.
+- Medication requirements, where applicable.
+- Contraindications and interactions.
+- Referral requirements.
+- Time limit, if justified.
+- Scoring rubric.
+- Critical safety errors.
+- Simulated outcome rules.
+- Educational explanations.
+- Relevant clinical references.
+
+The scenario, visual representation, patient history, treatment requirements, and evaluation rules must all describe the same patient and clinical problem.
+
+For example, the system must not generate an asthma case but evaluate the user's actions against an anaphylaxis rubric.
+
+Structured generation
+
+Use a validated schema for case data.
+
+Reject or repair malformed cases before presenting them to users.
+
+If a generated case contains missing critical safety information, contradictory symptoms, unverified dosing, or an unreliable scoring rubric, do not present it as a valid clinical challenge.
+
+Use a validated fallback case when appropriate.
+
+The system must never sacrifice clinical safety simply to generate more variety.
+
+
+---
+
+8. Implement interactive trauma procedures
+
+This is one of the most important features.
+
+Trauma cases must contain practical procedures rather than merely describing what the user should do.
+
+Example A: A patient with a cut on the leg
+
+The application generates a case involving a patient with a cut on their leg.
+
+The patient illustration shows the injury, and the user receives a concise description of what happened.
+
+The available supplies appear in an interactive inventory.
+
+Possible items include:
+
+- Gloves.
+- Sterile gauze.
+- Appropriate wound-irrigation supplies.
+- Dressings.
+- Bandages.
+- Plasters.
+- Other suitable first-aid materials.
+
+The available items should depend on the scenario.
+
+Interactive workflow
+
+Stage 1: Initial assessment
+
+The user examines the injury and identifies the relevant findings.
+
+The simulator evaluates whether the user recognizes the severity of the wound, assesses bleeding, and identifies signs requiring referral.
+
+Stage 2: Select supplies
+
+The user selects appropriate protective equipment and wound-care materials.
+
+Stage 3: Perform wound care
+
+The user selects an action and applies it to the appropriate area of the illustration.
+
+For example, selecting a suitable irrigation action and applying it to an appropriate wound should update the simulated wound-care state.
+
+Stage 4: Handle contamination
+
+Where appropriate, the user identifies visible, accessible foreign material.
+
+The simulator must not encourage dangerous exploration of deep wounds or removal of embedded objects that require professional assessment.
+
+Stage 5: Control bleeding
+
+The user performs appropriate bleeding-control actions.
+
+The system must prioritize direct pressure and emergency escalation when indicated.
+
+Stage 6: Apply a dressing
+
+The user selects an appropriate dressing and applies it to the affected area.
+
+The dressing should become visible in the updated illustration.
+
+Stage 7: Determine the next action
+
+The user decides whether the wound can receive pharmacy-level first aid or requires medical assessment or emergency transfer.
+
+Stage 8: Complete the challenge
+
+The application evaluates the entire procedure, including the actions performed, the sequence, omitted steps, unnecessary interventions, and critical errors.
+
+Clinical requirements
+
+Do not teach users to routinely pour hydrogen peroxide, alcohol, or other inappropriate substances into open wounds.
+
+Use clinically appropriate wound-irrigation and dressing guidance.
+
+Do not instruct users to close deep, contaminated, gaping, or otherwise unsuitable wounds in a pharmacy.
+
+The correct sequence must depend on the actual wound and its severity.
+
+Interactive feedback
+
+If the user makes a mistake, provide feedback appropriate to the situation.
+
+For a noncritical mistake, the application might indicate that the selected action is inappropriate and allow the user to reconsider.
+
+For a critical emergency, the simulator should prioritize the required immediate action rather than forcing the user through every remaining interface step.
+
+Do not reveal every correct answer immediately. The challenge should still assess the user's knowledge.
+
+
+---
+
+9. Implement interactive burn care
+
+Create a separate procedure workflow for burn scenarios.
+
+The user should see a visual representation of the burn and the affected body part.
+
+The simulator should test appropriate actions, including:
+
+- Assessing the cause and severity of the burn.
+- Initiating appropriate cooling.
+- Removing constricting items when safe.
+- Avoiding harmful substances and inappropriate interventions.
+- Applying an appropriate covering.
+- Recognizing injuries that require urgent medical assessment.
+- Arranging referral or emergency transfer when indicated.
+
+The user should interact with the illustration and available supplies to perform the procedure.
+
+The application must penalize clinically inappropriate actions, such as applying ice directly to the burn, using butter or toothpaste, or delaying necessary emergency referral.
+
+The exact workflow must reflect the applicable clinical guidance and the characteristics of the case.
+
+
+---
+
+10. Implement time-sensitive emergency challenges
+
+Some cases must involve time pressure.
+
+Examples include:
+
+- Anaphylaxis.
+- Acute asthma exacerbations.
+- Ongoing seizures.
+- Severe bleeding.
+- Other emergencies for which time-sensitive action is clinically justified.
+
+Example B: Asthma attack
+
+The application displays a patient experiencing breathing difficulty.
+
+A visible countdown begins.
+
+The user must assess the presentation, identify the severity, and select the appropriate immediate response.
+
+Depending on the scenario, the user may need to:
+
+1. Recognize the emergency.
+2. Position or assist the patient appropriately.
+3. Select the appropriate prescribed or protocol-authorized reliever treatment.
+4. Follow verified medication administration guidance.
+5. Assess the patient's response.
+6. Escalate care when the patient is severely unwell or fails to improve appropriately.
+
+The simulator must not reward an incorrect treatment simply because it was administered quickly.
+
+Dynamic patient state
+
+The application should track the simulated patient condition.
+
+For example:
+
+Initial presentation → User action → Safety validation → Simulated response → Updated patient condition
+
+The outcome must depend on the clinical rules associated with the specific case.
+
+An appropriate intervention may improve the simulated condition.
+
+An ineffective intervention may fail to improve symptoms.
+
+A dangerous intervention or delay may trigger deterioration when clinically justified.
+
+The application must not claim that a particular treatment guarantees recovery.
+
+Timer rules
+
+The timer should reflect the urgency of the educational scenario.
+
+Do not invent universal clinical deadlines.
+
+When the timer expires, transition into the outcome and debrief stages.
+
+The system should explain which essential actions were missed and why they mattered.
+
+For real emergencies, actual emergency protocols always take precedence over game mechanics.
+
+Emergency priority
+
+Do not force users to complete unnecessary history-taking or administrative tasks while a patient needs immediate emergency intervention.
+
+The interface should prioritize urgent actions.
+
+Award bonus XP for appropriate, timely decisions.
+
+Apply substantial penalties for critical errors, dangerous delays, and failure to recognize deterioration.
+
+Speed alone must never be sufficient to earn a perfect score.
+
+
+---
+
+11. Support anaphylaxis, seizures, and other emergencies
+
+Build separate case logic for each emergency category.
+
+Do not use one generic emergency workflow for every condition.
+
+Anaphylaxis
+
+Evaluate recognition of severe allergic reactions, appropriate immediate emergency management, verified emergency medication protocols, and urgent escalation.
+
+Where the case requires epinephrine, use the applicable verified protocol and patient-specific requirements.
+
+Do not allow a user to obtain a successful outcome merely by selecting an antihistamine while missing the required first-line emergency intervention.
+
+Seizures
+
+Evaluate recognition of an ongoing seizure, protection from injury, appropriate timing and observation, recognition of prolonged or recurrent seizures, and emergency escalation.
+
+Penalize unsafe actions, such as attempting to restrain the patient or placing objects in their mouth.
+
+Severe bleeding
+
+Evaluate severity recognition, appropriate bleeding control, and urgent escalation.
+
+Do not allow the user to continue a routine dressing workflow when immediate emergency management is required.
+
+Other emergencies
+
+Every emergency must have its own:
+
+- Case definition.
+- Expected actions.
+- Critical safety rules.
+- Appropriate timer, if needed.
+- Outcome logic.
+- Scoring rubric.
+- Educational debrief.
+
+
+---
+
+12. Integrate the STG and existing drug list
+
+The existing clinical knowledge base is essential to the simulator.
+
+Inspect the repository to locate the STG and drug list.
+
+Determine their format, coverage, reliability, and how they are currently accessed.
+
+Reuse the existing knowledge base instead of creating a competing source of clinical truth.
+
+Where relevant, prioritize applicable Ghanaian Standard Treatment Guidelines and other authoritative clinical references appropriate to the scenario.
+
+Medication selection interface
+
+Where medication is appropriate, allow the user to search for and select medicines.
+
+Support:
+
+- Brand names.
+- Generic names.
+- Active ingredients.
+- Strengths.
+- Dosage forms.
+- Routes of administration.
+- Relevant indications.
+- Contraindications.
+- Relevant adverse effects.
+- Drug interactions.
+- Dose validation.
+- Patient-specific considerations.
+
+The interface should only present medication options appropriate to the scenario, while allowing the user to make clinically meaningful choices.
+
+Do not force medication administration into cases where the appropriate intervention is first aid, emergency activation, observation, or referral.
+
+Dose and frequency validation
+
+Suppose the user selects the correct medication but chooses an inappropriate dose or administration frequency.
+
+The system must identify the error and apply an appropriate scoring penalty.
+
+It must distinguish between a correct medication with a minor omission and a dangerous dosing error.
+
+Validate relevant medication details against reliable clinical rules.
+
+For pediatric cases, use verified age- or weight-based requirements when applicable.
+
+Never invent an emergency dose simply because the AI generated a scenario requiring treatment.
+
+If the necessary clinical reference is missing, flag the limitation and avoid confidently evaluating an unverified regimen.
+
+Drug interaction engine
+
+The system must compare proposed medicines against the patient's existing medications, allergies, medical history, and relevant clinical circumstances.
+
+It must distinguish between:
+
+- Interactions requiring monitoring.
+- Interactions requiring caution or an alternative.
+- Contraindicated combinations.
+- Potentially life-threatening combinations.
+
+A clinically significant interaction should affect the evaluation and simulated outcome when justified.
+
+However, the simulator must not invent dramatic complications to make a case more exciting.
+
+Use structured interaction references where available.
+
+AI-generated explanations must not be treated as the authoritative source for dosing, contraindications, or interaction severity.
+
+
+---
+
+13. Implement a reliable scoring engine
+
+Create a structured scoring engine that evaluates the user's actual actions.
+
+Every case must have a predefined scoring rubric before the user begins.
+
+Do not allow Grok to invent the final score after seeing the user's answer.
+
+Example scoring dimensions
+
+Assessment dimension	Example weight
+
+Recognition and assessment	20%
+Diagnosis or clinical impression	15%
+Immediate management	25%
+Medication safety, when applicable	20%
+Referral and follow-up	15%
+Communication and patient safety	5%
+
+
+These weights are examples, not fixed requirements for every case.
+
+A trauma procedure may emphasize correct technique and sequencing.
+
+Anaphylaxis may prioritize immediate management and emergency escalation.
+
+A medication interaction case may emphasize medication safety and recognition of contraindications.
+
+The rubric must adapt to the case.
+
+Evaluate actual behavior
+
+Track:
+
+- Correct actions.
+- Incorrect actions.
+- Omitted actions.
+- Actions performed in the wrong sequence.
+- Unnecessary interventions.
+- Incorrect medication selection.
+- Incorrect doses.
+- Contraindications.
+- Drug interactions.
+- Dangerous delays.
+- Appropriate referral.
+- Time taken, where relevant.
+
+A user must not receive a perfect score by selecting the final correct answer after skipping essential steps.
+
+Accept clinically equivalent answers and appropriate alternatives.
+
+Performance bands
+
+Below 50%: Critical failure
+
+Show that the simulated management failed or that the patient deteriorated when clinically appropriate.
+
+Explain the principal mistakes and show the correct management approach.
+
+Allow the user to retry or start a new case.
+
+50–79%: Partial success
+
+Show what the user did correctly and what was missed.
+
+The simulated patient may improve partially, remain unwell, or deteriorate depending on the case and the omitted interventions.
+
+Explain the necessary corrections.
+
+80–99%: Successful management with deficiencies
+
+Show a generally successful outcome only when the essential safety requirements were satisfied.
+
+Identify remaining omissions and risks.
+
+Award appropriate XP, but do not award a flawless-performance badge.
+
+100%: Flawless performance
+
+Award a perfect score only when all required actions and safety checks have been completed correctly.
+
+Grant the corresponding achievement if all badge requirements are met.
+
+Critical safety overrides
+
+A dangerous clinical error must override the aggregate score when appropriate.
+
+For example, a user who identifies anaphylaxis but fails to initiate the required emergency response must not automatically receive a successful result because the remaining answers were correct.
+
+Likewise, administering a dangerous contraindicated medication must trigger the relevant safety penalty.
+
+Keep these metrics distinct:
+
+- Numerical performance score.
+- Critical safety errors.
+- Simulated clinical outcome.
+- XP earned.
+- Category mastery.
+
+This makes the results more meaningful than a single percentage.
+
+
+---
+
+14. Simulate patient outcomes realistically
+
+The application must simulate the consequences of the user's decisions.
+
+Possible outcomes include:
+
+- Appropriate improvement.
+- Full recovery within the limits of the scenario.
+- Partial improvement.
+- Persistent symptoms.
+- Need for additional intervention.
+- Adverse medication effects.
+- Deterioration.
+- Emergency escalation.
+- Treatment failure.
+
+Not every outcome is appropriate for every case.
+
+For example, omitting a nonessential step during minor wound care should not automatically cause severe deterioration.
+
+A dangerous error during anaphylaxis may have much more serious consequences.
+
+Outcome calculation
+
+Determine the outcome using:
+
+1. The predefined case facts.
+2. The user's recorded actions.
+3. The validated scoring rubric.
+4. Critical safety rules.
+5. Verified medication and procedure requirements.
+6. Clinically appropriate response rules.
+7. Relevant time-sensitive factors.
+
+Use deterministic application logic for the authoritative outcome.
+
+Grok may provide the narrative explanation, but it must not freely decide the patient's fate without reference to the actual case rules.
+
+Clearly label results as simulated educational outcomes.
+
+Explain that they represent the scenario's programmed response and are not predictions of what would necessarily happen to a real patient.
+
+
+---
+
+15. Add XP, achievements, and progression
+
+Make completing a challenge rewarding.
+
+Users should receive XP for demonstrating clinical competence rather than merely clicking through a case.
+
+Award points for:
+
+- Correct assessment.
+- Appropriate diagnosis.
+- Safe medication selection.
+- Correct dosing when applicable.
+- Correct procedure sequencing.
+- Appropriate first aid.
+- Recognition of contraindications.
+- Correct interaction management.
+- Timely emergency response.
+- Appropriate referral.
+- Completing a case without critical errors.
+
+Apply appropriate penalties for dangerous decisions and repeated errors.
+
+Do not award full XP for repeatedly guessing until the answer becomes correct.
+
+Example achievements
+
+Clean Hands: Correct protective-equipment and infection-control decisions.
+
+Wound Specialist: Flawless performance in an eligible wound-care challenge.
+
+Rapid Responder: Correct recognition and timely management of an emergency.
+
+Interaction Hunter: Correctly identifies and manages a clinically significant drug interaction.
+
+Guardian: Demonstrates safe management of an eligible child or caregiver scenario.
+
+No Shortcuts: Completes all mandatory steps without omissions.
+
+Zero Critical Errors: Completes a case without a critical safety violation.
+
+Perfect Run: Achieves a 100% score without critical errors.
+
+Emergency Master: Demonstrates consistent competence across multiple emergency categories.
+
+These ranks and badges must be clearly identified as game achievements, not real-world professional qualifications.
+
+Progression requirements
+
+Users should unlock higher ranks through a combination of XP and demonstrated performance.
+
+Do not allow a user to become an Emergency Master merely by completing many easy cases.
+
+Require appropriate evidence of competence across the relevant categories.
+
+
+---
+
+16. Integrate everything with the existing Identity Profile
+
+Inspect the current IDP implementation before changing it.
+
+Do not create a separate profile system just for the Challenge tab.
+
+Every completed challenge should update the appropriate existing records.
+
+Track:
+
+- Total XP.
+- Current level.
+- Cases attempted.
+- Cases completed.
+- Successful cases.
+- Average performance score.
+- Critical errors.
+- Category mastery.
+- Achievements.
+- Current streak.
+- Personal bests.
+- Recent performance history.
+
+Keep game progression separate from clinical performance metrics.
+
+Persist results using the existing backend or database.
+
+The user's progress should survive refreshes, app restarts, and new sessions.
+
+Prevent duplicate rewards if a user refreshes a completed challenge or submits the same result more than once.
+
+Where the architecture supports it, validate scores and badge awards on the server instead of trusting client-side values.
+
+A failed AI request must never corrupt the user's IDP or award unearned XP.
+
+
+---
+
+17. Create a detailed end-of-case debrief
+
+After every completed or failed case, present a clear evaluation.
+
+The debrief should show:
+
+Performance summary
+
+- Final percentage.
+- Simulated patient outcome.
+- Critical safety errors.
+- XP earned or deducted.
+- Achievements unlocked.
+- Updated category mastery.
+
+Clinical evaluation
+
+- What the user did correctly.
+- What the user missed.
+- Incorrect or dangerous actions.
+- The correct management sequence.
+- Relevant medication information.
+- Important interactions or contraindications.
+- Referral requirements.
+- Why the correct actions matter.
+
+Procedure review
+
+For interactive trauma cases, show the actions performed alongside the expected actions.
+
+Identify omitted steps and incorrect sequencing.
+
+Where appropriate, show the final patient illustration and explain how the treatment affected the simulated condition.
+
+Learning support
+
+Provide concise, understandable explanations based on the STG and other relevant verified references.
+
+Recommend related challenges when the user demonstrates a weakness in a particular category.
+
+Available actions
+
+Include:
+
+- Retry Case.
+- Review Correct Management.
+- Generate New Case.
+- Return to Challenges.
+
+Preserve the original attempt when the user retries.
+
+Do not erase previous mistakes or award duplicate XP for the same attempt.
+
+
+---
+
+18. Use Grok appropriately
+
+Reuse the existing Grok API integration and its current configuration.
+
+Do not introduce another AI provider unnecessarily.
+
+Keep the API key on the server.
+
+Never expose the key in frontend JavaScript, public configuration, or client-visible responses.
+
+Use Grok for appropriate tasks, including:
+
+- Generating diverse clinical scenarios.
+- Creating patient dialogue.
+- Producing educational explanations.
+- Generating contextual debrief narratives.
+
+Use structured application logic for:
+
+- Score calculation.
+- Medication validation.
+- Critical safety overrides.
+- Procedure sequencing.
+- Time tracking.
+- XP calculations.
+- Badge eligibility.
+- IDP updates.
+- Simulated patient outcomes.
+
+The AI should not be the sole authority for safety-critical clinical decisions.
+
+Validate generated cases against a defined schema before displaying them.
+
+Handle:
+
+- API timeouts.
+- Rate limits.
+- Malformed responses.
+- Missing data.
+- Invalid cases.
+- Temporary service outages.
+
+Provide meaningful loading and error states.
+
+When a generated case is invalid, reject it and use a validated fallback when available.
+
+
+---
+
+19. Make the interface feel like a real game
+
+The Challenge tab should have a polished, professional visual identity.
+
+Use:
+
+- Clear patient illustrations.
+- Interactive body regions.
+- Selectable medical supplies.
+- Treatment progress indicators.
+- Appropriate animations.
+- Timers for justified emergency cases.
+- Clear feedback for successful actions.
+- Visible patient-state changes.
+- XP reward animations.
+- Badge-unlock celebrations.
+- Distinct outcome screens.
+- Smooth transitions.
+- Touch-friendly controls.
+
+The interface should feel engaging without distracting the user from clinical decisions.
+
+Avoid excessive animations, unnecessary menus, tiny text, or complicated interactions that make the application difficult to use on a phone.
+
+During emergencies, essential information and actions must remain immediately accessible.
+
+The app should work well on the Android device's small screen and should not require a desktop computer.
+
+
+---
+
+20. Testing requirements
+
+Before considering the implementation complete, test the following scenarios.
+
+Test	Expected behavior
+
+Minor cut	User can interact with the wound and complete appropriate first aid.
+Burn	User can perform appropriate first aid and identify referral requirements.
+Anaphylaxis	Essential emergency actions and escalation are prioritized.
+Asthma attack	Time-sensitive actions and patient-response logic work correctly.
+Seizure	Appropriate first aid and emergency escalation are evaluated.
+Medication interaction	A clinically significant interaction is detected when supported by the reference data.
+Incorrect dosage	The system identifies the error and applies an appropriate penalty.
+Partially correct treatment	The patient outcome reflects the actual omissions and case rules.
+Dangerous intervention	A critical safety override prevents an unqualified successful outcome.
+Flawless performance	The correct score, XP, and eligible badge are awarded.
+Failed Grok request	The app handles the failure without corrupting progress.
+Page refresh	An unfinished challenge can resume where supported.
+Completed challenge	Results persist after refreshing the application.
+Challenge retry	Previous attempts remain recorded and rewards are not duplicated.
+Mobile interaction	Tapping and applying supplies work correctly on a small touchscreen.
+Learning tab	Existing written case generation continues to work.
+IDP integration	Challenge results update the existing profile correctly.
+
+
+Also test malformed AI responses, missing clinical references, duplicate submissions, and inappropriate medication selections.
+
+Do not claim a test passed unless it was actually executed.
+
+
+---
+
+21. Implementation process
+
+Work directly in the existing repository.
+
+Follow this sequence.
+
+Phase 1: Inspect
+
+Identify the existing architecture, Challenge tab, Learning tab, STG knowledge base, drug list, Grok integration, IDP, and persistence mechanisms.
+
+Phase 2: Design the architecture
+
+Determine how the application will represent patient cases, interactive actions, clinical rules, timers, scoring, patient states, and progression.
+
+Define structured case data and validation rules.
+
+Phase 3: Build the 2D interaction system
+
+Implement patient illustrations, interactive injury regions, medical-supply inventories, tap-to-apply actions, and visual treatment states.
+
+Phase 4: Build the clinical simulation engine
+
+Implement the assessment workflow, procedure rules, medication checks, emergency timers, safety overrides, scoring, and patient-outcome calculations.
+
+Phase 5: Integrate AI and clinical references
+
+Connect case generation to the existing Grok API and validate generated cases against the available STG and drug database.
+
+Phase 6: Implement gamification and IDP integration
+
+Add XP, achievements, progression, case history, and persistent results using the existing profile system.
+
+Phase 7: Build the debrief
+
+Display scores, errors, clinical explanations, patient outcomes, rewards, and retry options.
+
+Phase 8: Test and refine
+
+Execute the test scenarios, fix identified problems, verify mobile interactions, and confirm that existing application functionality remains intact.
+
+Work in manageable stages, but continue until the feature is implemented and tested as fully as the available environment permits.
+
+Do not stop after creating a design mockup.
+
+Do not leave essential buttons disconnected.
+
+Do not substitute hardcoded scores for actual evaluation.
+
+Do not claim the entire feature works when only the interface has been built.
+
+
+---
+
+22. Final acceptance criteria
+
+The Challenge tab is ready only when the following core experience works:
+
+Select a challenge → Generate a valid case → Meet the patient → Inspect the situation → Gather information → Perform interactive first aid or emergency actions → Make appropriate clinical decisions → Select safe treatment where applicable → Simulate the patient's response → Receive a clinical debrief → Earn appropriate rewards → Update the existing IDP → Retry or continue.
+
+Different cases may use different workflows, depending on their clinical requirements.
+
+A minor cut should emphasize practical wound care.
+
+A burn should emphasize appropriate burn first aid and severity assessment.
+
+An asthma attack should emphasize timely recognition, appropriate treatment, and reassessment.
+
+Anaphylaxis should prioritize immediate emergency management and escalation.
+
+A medication emergency should emphasize safe medication decisions, contraindications, and relevant interactions.
+
+Every case must remain clinically coherent and appropriately scoped for a pharmacy education simulator.
+
+The ultimate goal is to transform the Challenge tab from a text-based question experience into a functional, visually interactive, 2D pharmacy emergency training game.
+
+The simulator must reward clinical competence, make mistakes educational, provide realistic simulated consequences, and preserve the functionality of the existing application.
+
+Final instructions to Replica AI
+
+Start by inspecting the existing repository and identifying the files and systems involved.
+
+Then implement the feature directly in the project.
+
+Use sensible defaults for minor design decisions.
+
+If a necessary file, clinical reference, API configuration, or backend capability is missing, identify the specific limitation and implement what can safely be completed without it.

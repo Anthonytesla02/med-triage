@@ -1,0 +1,6 @@
+{
+  "name": "PharmEmerg 2D - Pharmacy Trauma & Emergency Simulator",
+  "description": "Interactive gamified 2D pharmacy trauma, burn care, and acute emergency simulator with clinical Standard Treatment Guidelines, realistic patient avatars, and clinical progression.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
